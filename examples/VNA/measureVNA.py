@@ -273,7 +273,6 @@ for i in range(0, len(freqs)):
     lms7002.SX['T'].setFREQ(f)
     lms7002.SX['T'].PD_LOCH_T2RBUF = 0
     syncPhase(lms7002)
-    
     pgaGain, lnaGain = adjustRxGain(lms7002)
     pgaGains.append(pgaGain)
     lnaGains.append(lnaGain)
@@ -301,6 +300,18 @@ for i in range(0, len(freqs)):
         phase = 0.0
     else:
         phase = mcuPhase()-refPhase
+#turn on loopback here, then recalibrate power (or set it to lowest) and measure phase, subtract this phase.
+    TRF.EN_LOOPB_TXPAD_TRF = 1
+    pgaGain, lnaGain = adjustRxGain(lms7002)
+    if i == 0:
+        refcalphase = mcuPhase()
+    else:
+        calphase = mcuPhase()
+        if (calphase-refcalphase+4)%360 > 8:
+            phase = phase - 180.0
+    TRF.EN_LOOPB_TXPAD_TRF = 0
+#turn off loopback here
+
     endTime = timer()
     resPhase.append(phase)
     lms7002.verbose=1000
@@ -369,6 +380,14 @@ for i in range(0, len(freqs)):
     
     res.append(rssi)
     phase = mcuPhase()-refPhase
+#turn on loopback here, then recalibrate power (or set it to lowest) and measure phase, subtract this phase.
+    TRF.EN_LOOPB_TXPAD_TRF = 1
+    pgaGain, lnaGain = adjustRxGain(lms7002)
+    calphase = mcuPhase()
+    if (calphase-refcalphase+4)%360 > 8:
+        phase = phase - 180.0
+    TRF.EN_LOOPB_TXPAD_TRF = 0
+#turn off loopback here
     resPhase.append(phase)
     endTime = timer()
     lms7002.verbose=1000
