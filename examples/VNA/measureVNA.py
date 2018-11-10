@@ -88,6 +88,7 @@ def userConfirmation(msg):
         userReady = raw_input(msg + '. Type y to continue. ')    
 
 def syncPhase(lms7002):
+#turn the clock distribution and synchronization off and then back on again
     TRF = lms7002.TRF['A']
     RFE = lms7002.RFE['A']
     SXT = lms7002.SX['T']
@@ -202,6 +203,7 @@ RxTSP = lms7002.RxTSP['A']
 RxTSP.GCORRQ = 2047
 RxTSP.GCORRI = 2047
 
+#Turn off everything in the signal modulation in the TXTSP; use only the carrier.
 TxTSP = lms7002.TxTSP['A']
 TxTSP.TSGMODE = 'DC'
 TxTSP.INSEL = 'TEST'
@@ -261,6 +263,7 @@ userConfirmation("Connect SHORT")
 freqs = numpy.linspace(startFreq, endFreq, num=nPoints)
 res = []
 resPhase = []
+loopbPhase = []
 pgaGains = []
 lnaGains = []
 for i in range(0, len(freqs)):
@@ -302,14 +305,11 @@ for i in range(0, len(freqs)):
         phase = mcuPhase()-refPhase
 #turn on loopback here, then recalibrate power (or set it to lowest) and measure phase, subtract this phase.
     TRF.EN_LOOPB_TXPAD_TRF = 1
+    TRF.L_LOOPB_TXPAD_TRF = 3
     pgaGain, lnaGain = adjustRxGain(lms7002)
-    if i == 0:
-        refcalphase = mcuPhase()
-    else:
-        calphase = mcuPhase()
-        if (calphase-refcalphase+4)%360 > 8:
-            phase = phase - 180.0
+    loopbPhase.append(mcuPhase())
     TRF.EN_LOOPB_TXPAD_TRF = 0
+    TRF.L_LOOPB_TXPAD_TRF = 0
 #turn off loopback here
 
     endTime = timer()
@@ -384,8 +384,8 @@ for i in range(0, len(freqs)):
     TRF.EN_LOOPB_TXPAD_TRF = 1
     pgaGain, lnaGain = adjustRxGain(lms7002)
     calphase = mcuPhase()
-    if (calphase-refcalphase+4)%360 > 8:
-        phase = phase - 180.0
+    if (calphase-loopbPhase[i]+90)%360 > 180:
+        phase = (phase - 180.0) % 360
     TRF.EN_LOOPB_TXPAD_TRF = 0
 #turn off loopback here
     resPhase.append(phase)
