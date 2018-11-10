@@ -407,3 +407,69 @@ for i in range(0,len(res)):
 outFile.write(txtRes)
 outFile.close()
 
+userConfirmation("Connect open")
+
+freqs = numpy.linspace(startFreq, endFreq, num=nPoints)
+res = []
+resPhase = []
+for i in range(0, len(freqs)):
+    # Measure the open reflected power and phase
+    f = freqs[i]
+    logTxt("f="+str(f)+"... ", end="")
+    startTime = timer()
+    pgaGain = pgaGains[i]
+    lnaGain = lnaGains[i]
+    RBB.G_PGA_RBB = pgaGain
+    RFE.G_LNA_RFE = lnaGain    
+    if i!= 0:
+        lms7002.verbose=0
+        lms7002.SX['T'].setFREQ(f)
+        lms7002.SX['T'].PD_LOCH_T2RBUF = 0
+        syncPhase(lms7002)
+    
+        TRF.PD_TXPAD_TRF = 1
+        calRSSI = RxTSP.RSSI
+        if calRSSI>calThreshold:
+            cal.rxDCLO('A', LNA, lnaGain=lnaGain, pgaGain=pgaGain)
+            calRSSI = RxTSP.RSSI
+        TRF.PD_TXPAD_TRF = 0    
+
+    TxTSP.CMIX_BYP = 'USE'
+    RxTSP.GC_BYP = 'USE'
+    RxTSP.GCORRQ = 0
+    
+    rssi = 1.0*mcuRSSI()
+
+    TxTSP.CMIX_BYP = 'BYP'
+    RxTSP.GC_BYP = 'BYP'
+    RxTSP.GCORRQ = 2047
+    
+    res.append(rssi)
+    phase = mcuPhase()-refPhase
+#turn on loopback here, then recalibrate power (or set it to lowest) and measure phase, subtract this phase.
+    TRF.EN_LOOPB_TXPAD_TRF = 1
+    pgaGain, lnaGain = adjustRxGain(lms7002)
+    calphase = mcuPhase()
+    if (calphase-loopbPhase[i]+90)%360 > 180:
+        phase = (phase - 180.0) % 360
+    TRF.EN_LOOPB_TXPAD_TRF = 0
+#turn off loopback here
+    resPhase.append(phase)
+    endTime = timer()
+    lms7002.verbose=1000
+    logTxt("OK\t("+str(float(round(float(endTime-startTime)*10))/10)+" s)\t("+str(i+1)+"/"+str(nPoints)+") RSSI = "+str(rssi)+" (Cal = "+str(calRSSI)+")"+" phase = "+str(phase))
+
+res = numpy.array(res)
+
+# Write the data to file
+outFileName = 'vna_'+measName+'_open_'+str(startFreq)+'_'+str(endFreq)+'_'+str(nPoints)+'.txt'
+outFile = open(outFileName, 'w')
+txtRes = "# f, coupled power\n"
+for i in range(0,len(res)):
+    f = freqs[i]
+    y = res[i]
+    phase = resPhase[i]
+    txtRes += str(f)+'\t'+str(y)+'\t'+str(phase)+'\n'
+outFile.write(txtRes)
+outFile.close()
+
